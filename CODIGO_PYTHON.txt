@@ -1,0 +1,110 @@
+"""
+Sesión 05 - Movimiento, velocidad y aceleración 1D
+Taller de Mecánica Experimental 2026-II (FCF-UNMSM)
+
+Genera:
+  - Gráfica 1: x vs t (papel milimetrado)
+  - Gráfica 2: x vs t^2 con ajuste por mínimos cuadrados
+  - Gráfica 3: aceleración experimental vs teórica
+Requisitos: pip install numpy matplotlib
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ---------------- Datos (Tracker, dados por el docente) ----------------
+t = np.round(np.arange(0, 1.5, 0.1), 1)          # s
+M = 0.200                                         # masa del móvil (kg)
+g = 9.8                                           # m/s^2
+x = {                                             # masa colgante (g): posiciones (m)
+    10: [0, .01, .01, .02, .04, .06, .07, .11, .15, .19, .23, .28, .32, .38, .45],
+    20: [0, 0, .02, .04, .07, .11, .16, .21, .27, .36, .43, .53, .62, .74, .86],
+    30: [0, .01, .02, .05, .10, .16, .23, .31, .40, .51, .63, .76, .90, 1.06, 1.23],
+    40: [0, .01, .03, .07, .12, .20, .29, .40, .51, .65, .80, .97, 1.15, 1.36, 1.56],
+    50: [0, .01, .04, .08, .16, .24, .33, .47, .61, .78, .95, 1.17, 1.38, 1.62, 1.88],
+}
+colores = {10: '#1f3a93', 20: '#b71c1c', 30: '#1b5e20', 40: '#6a1b9a', 50: '#212121'}
+marcas = {10: 'o', 20: 's', 30: '^', 40: 'D', 50: 'v'}
+
+
+# ---------------- Mínimos cuadrados: x = A + B*u, con u = t^2 ----------------
+def minimos_cuadrados(u, y):
+    n = len(u)
+    Su, Sy, Suy, Suu, Syy = u.sum(), y.sum(), (u * y).sum(), (u * u).sum(), (y * y).sum()
+    den = n * Suu - Su ** 2
+    A = (Suu * Sy - Su * Suy) / den
+    B = (n * Suy - Su * Sy) / den
+    chi2 = ((A + B * u - y) ** 2).sum()
+    sA = np.sqrt(Suu / den * chi2 / (n - 2))
+    sB = np.sqrt(n / den * chi2 / (n - 2))
+    r = (n * Suy - Su * Sy) / (np.sqrt(den) * np.sqrt(n * Syy - Sy ** 2))
+    return A, B, sA, sB, chi2, r
+
+
+u = t ** 2
+res = {}
+print(f"{'m(g)':>5} {'A(m)':>9} {'sA':>8} {'B(m/s2)':>9} {'sB':>8} {'r':>9} {'a=2B':>8} {'a_teo':>8} {'dif%':>6}")
+for m, xs in x.items():
+    xs = np.array(xs)
+    A, B, sA, sB, chi2, r = minimos_cuadrados(u, xs)
+    a, sa = 2 * B, 2 * sB
+    a_teo = (m / 1000) * g / (M + m / 1000)
+    res[m] = dict(A=A, B=B, a=a, sa=sa, a_teo=a_teo)
+    print(f"{m:>5} {A:>9.4f} {sA:>8.4f} {B:>9.4f} {sB:>8.4f} {r:>9.5f} {a:>8.3f} {a_teo:>8.3f} {(a - a_teo) / a_teo * 100:>6.1f}")
+
+
+# ---------------- Papel milimetrado ----------------
+def papel(ancho_cm, alto_cm, xmax, ymax, xcm, ycm, xlabel, ylabel, titulo):
+    """xcm, ycm = unidades de la variable que corresponden a 1 cm de papel."""
+    fig = plt.figure(figsize=((ancho_cm + 2.6) / 2.54, (alto_cm + 2.2) / 2.54))
+    ax = fig.add_axes([1.8 / (ancho_cm + 2.6), 1.5 / (alto_cm + 2.2),
+                       ancho_cm / (ancho_cm + 2.6), alto_cm / (alto_cm + 2.2)])
+    ax.set_xlim(0, xmax)
+    ax.set_ylim(0, ymax)
+    ax.set_xticks(np.arange(0, xmax + 1e-9, xcm))
+    ax.set_yticks(np.arange(0, ymax + 1e-9, ycm))
+    ax.set_xticks(np.arange(0, xmax + 1e-9, xcm / 10), minor=True)   # 1 mm
+    ax.set_yticks(np.arange(0, ymax + 1e-9, ycm / 10), minor=True)
+    ax.grid(which='minor', color='#f2b6a0', lw=0.35)
+    ax.grid(which='major', color='#e07a5f', lw=0.7)
+    for v in np.arange(0, xmax + 1e-9, xcm / 2):                      # 5 mm
+        ax.axvline(v, color='#e8977c', lw=0.5, zorder=0)
+    for v in np.arange(0, ymax + 1e-9, ycm / 2):
+        ax.axhline(v, color='#e8977c', lw=0.5, zorder=0)
+    ax.tick_params(which='minor', length=0)
+    ax.tick_params(labelsize=8, length=3)
+    ax.set_facecolor('#fff9f6')
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel(ylabel, fontsize=10)
+    ax.set_title(titulo, fontsize=10.5, pad=6)
+    return fig, ax
+
+
+# Gráfica 1: x vs t
+fig, ax = papel(15, 10, 1.5, 2.0, 0.1, 0.2, 't (s)', 'x (m)', 'Gráfica 1. Posición x vs tiempo t')
+for m, xs in x.items():
+    ax.plot(t, xs, marcas[m], color=colores[m], ms=4, label=f'm = {m} g')
+    ax.plot(t, xs, '-', color=colores[m], lw=0.9)
+ax.legend(loc='upper left', fontsize=8.5)
+fig.savefig('grafica1_x_vs_t.png', dpi=250)
+
+# Gráfica 2: x vs t^2 con recta ajustada
+fig, ax = papel(11, 11, 2.2, 2.2, 0.2, 0.2, 't² (s²)', 'x (m)',
+                'Gráfica 2. Posición x vs t² (ajuste por mínimos cuadrados)')
+for m, xs in x.items():
+    ax.plot(u, xs, marcas[m], color=colores[m], ms=4, label=f'm = {m} g')
+    uu = np.array([0, 2.0])
+    ax.plot(uu, res[m]['A'] + res[m]['B'] * uu, '-', color=colores[m], lw=1.0)
+ax.legend(loc='upper left', fontsize=8.5)
+fig.savefig('grafica2_x_vs_t2.png', dpi=250)
+
+# Gráfica 3: a experimental vs teórica
+fig, ax = papel(12, 11, 60, 2.2, 5, 0.2, 'm (g)', 'a (m/s²)',
+                'Gráfica 3. Aceleración a vs masa colgante m')
+mm = np.linspace(0, 60, 100)
+ax.plot(mm, (mm / 1000) * g / (M + mm / 1000), '--', color='#555', lw=1, label='teórica  a = mg/(M+m)')
+ax.errorbar(list(res), [res[m]['a'] for m in res], yerr=[res[m]['sa'] for m in res],
+            fmt='o', color='#b71c1c', ms=4.5, capsize=2, lw=0.8, label='experimental  a = 2B')
+ax.legend(loc='upper left', fontsize=8.5)
+fig.savefig('grafica3_a_vs_m.png', dpi=250)
+
+plt.show()
